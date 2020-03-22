@@ -1,0 +1,5 @@
+update OptionDetails 
+ INNER JOIN  OptionDescriptions ON OptionDescriptions.OptionID = OptionDetails.OptionID
+Set OptionDetails.FuturesSymbol = OptionDescriptions.UnderlyingSymbol, OptionDetails.FuturesPrice = 1880.00
+WHERE (((OptionDescriptions.UnderlyingSymbol)="ESZ15") AND ((OptionDetails.TradeDateTime)=#8/24/2015 14:12:00#))
+

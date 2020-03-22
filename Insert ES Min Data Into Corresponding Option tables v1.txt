@@ -1,0 +1,154 @@
+from datetime import date
+from datetime import datetime, timedelta
+import datetime
+import calendar
+import pyodbc
+
+
+def ConvertToTime(ESDate, ESTimeInNumber):
+    ESMinute = ESTimeInNumber[-2:]
+    ESMinuteLen = len(ESTimeInNumber)
+    ESHourLen = ESMinuteLen - 2
+    ESHour = ESTimeInNumber[ESHourLen:]
+    if (ESHour < 10):
+        ESHour = "0" + ESHour
+    
+    ESAnswer = ESDate + ' ' + ESHour + ':' + ESMinute + ':00'
+    dtESAnswer = datetime.strptime(ESAnswer, '%m/%d/%y %H:%M:%S')
+    return dtESAnswer    
+        
+        
+connOptDB = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=C:\Users\rross\Dropbox\OptionHistory.accdb;')
+cursorOptInfo = connOptDB.cursor()
+connESDB = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=C:\Users\rross\Dropbox\ESHistory2.accdb;')
+cursorESInfo = connESDB.cursor()
+#cursorOptInfo = connOptDB.cursor()
+
+
+#-----------------------------------------------------------------------------------------------
+# RRoss 20200321 - Get each futures contract and load into a List
+#-----------------------------------------------------------------------------------------------
+
+sSQL = "select * from UnderlyingInfo where expiry > #12/1/2014# order by Expiry "
+print(sSQL)
+cursorOptInfo.execute(sSQL)
+print(str(cursorOptInfo.rowcount))
+i = 0
+ESInfoList = []
+
+
+for row in cursorOptInfo.fetchall():
+    i = i + 1
+    #print (row)
+    #print (row[1])
+    UnderlyingInfoID = row[0]
+    ESSymbol = row[1]
+    dtESExpiry = row[3]
+    ESExpiry = row[3]      # str('{:%m/%d/%Y}'.format(dtESExpiry))
+    CurrentList = []
+    CurrentList.append(UnderlyingInfoID)
+    CurrentList.append(ESSymbol) 
+    CurrentList.append(ESExpiry) 
+    ESInfoList.append(CurrentList)
+    #ESInfoList.Append(CurrentList)
+
+i = 0
+for x in ESInfoList:
+    i += 1
+    print(i)
+    print(x)
+    print(x[2])
+    print(' ')
+    
+    UnderlyingInfoID = x[0]
+    ESSymbol = x[1]
+    dtOrigExpiry = x[2]
+
+    dtExpiry = x[2]
+    
+    #ESdatetime_str = dtExpiry #+ ' 00:00:00'
+    #ESdatetime_object = datetime.datetime.strptime(ESdatetime_str, '%m/%d/%y %H:%M:%S')
+    
+    #strOrigESExpiry = dtExpiry.strftime("%m/%d/%Y")
+    #dtExpiry += timedelta(days=1)
+    #strExpiryPlusOne = dtExpiry.strftime("%m/%d/%Y")   # str('{:%m/%d/%Y}'.format(dtExpiry))
+    #strExpiryPlusOne = ESdatetime_object.strftime("%m/%d/%Y")   # str('{:%m/%d/%Y}'.format(dtExpiry))
+    
+    #-----------------------------------------------------------------------------------------------
+    # RRoss 20200321 - Get Options that use this ES Futures contract as the underlying
+    #-----------------------------------------------------------------------------------------------
+    sSQL = "Select * from OptionDescriptions where UnderlyingSymbol = '" + ESSymbol "'"
+    print(sSQL)
+    cursorOptInfo.execute(sSQL)    
+    
+    j = 0
+    OptLabelList = []
+    for row in cursorOptInfo.fetchall():
+        j += 1
+        #print (row)
+        #print (row[1])
+        OptionID = row[0]
+        OptLabelList.append(OptionID)    
+    
+    
+        # If there is at least one option contract exists for this underlying future contract
+        # then get the fut price for each minute and load into a list
+        if (j==1):
+            ESMinuteDataList = []
+            
+            sSQLES = "Select * from ESHistory "
+            sSQLES += " Where ESSymbol = '" + strPrevExpiry + "' "
+            sSQLES += " Order by ESDate, ESTime " 
+            
+            print(ssQLES)
+            
+            cursorESInfo.execute(sSQL)  
+            
+            iESRowCnt = 0
+            for rowES in cursorESInfo.fetchall():
+                iESRowCnt += 1
+                ESRowList = []
+                ESRowSymbol = rowES[2]
+                ESRowDate = rowES[3]
+                ESRowTime = rowES[4]
+                ESRowClose = rowES[8]
+                ESRowList.append(ESRowSymbol)
+                ESRowList.append(ESRowDate)
+                ESRowList.append(ESRowTime)
+                
+                ESRowList.append(ESRowClose)
+
+                ESMinuteDataList.append(ESRowList)
+                    
+        if (j>0):        
+            dtESDateTime = ConvertToTime(ESRowDate, ESRowTime)                
+                
+            sSQLUpdate = "Update OptionDescriptions "
+            sSQLUpdate += " Set UnderlyingSymbol = '" + ESSymbol + "',  "
+            sSQLUpdate += " UnderlyingSymbolID = " + str(UnderlyingInfoID) + ", "
+            sSQLUpdate += " UnderlyingSymbolExpiry = #" + strOrigESExpiry + "# "
+            sSQLUpdate += " Where OptionDescriptions.Expiry > #" + strPrevExpiry + "# "
+            sSQLUpdate += " and OptionDescriptions.Expiry <= #" + strExpiryPlusOne + "# "
+
+            print('SQL:')
+            print(sSQLUpdate)
+
+            #connOptDB.execute(sSQLUpdate)
+            #connOptDB.commit()
+    
+    #dtPrevExpiry = x[2] + timedelta(days=1)
+    strPrevExpiry = '{:%m/%d/%Y}'.format(dtExpiry)
+    #if (i>25):
+        #break;
+        
+connOptDB.close()   
+connESDB.close()  
+            
+print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+print(' ')
+print(' PROCESS FINISHED ')
+print(' ')
+print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+        
+
+    
